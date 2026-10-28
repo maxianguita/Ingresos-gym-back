@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Generar QR de cliente</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f7f7f8;margin:0}
+    .wrap{max-width:760px;margin:24px auto;padding:16px}
+    .card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);padding:16px}
+    .row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    input,button{padding:10px 14px;border-radius:10px;border:1px solid #e5e7eb}
+    button{background:#111827;color:#fff;border:0}
+    #preview{display:flex;gap:24px;align-items:center;margin-top:16px}
+    .badge{font-size:13px;color:#6b7280}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>Generar QR del cliente</h2>
+      <div class="row">
+        <input id="id" placeholder="ID de cliente (número)" />
+        <button id="go">Generar</button>
+        <span class="badge">Tip: también podés abrir con ?id=123</span>
+      </div>
+      <div id="info"></div>
+      <div id="preview" style="display:none">
+        <canvas id="qrcanvas"></canvas>
+        <div>
+          <div id="who" style="font-weight:700"></div>
+          <div id="url" style="word-break:break-all;color:#374151;margin-top:6px"></div>
+          <button id="printBtn" style="margin-top:12px">Imprimir</button>
+          <div class="badge" style="margin-top:8px">El cliente escanea este QR con la cámara del celular.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CDN liviano para generar QR en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script>
+    const API = location.origin;
+
+    async function load(id){
+      document.getElementById('info').textContent='';
+      document.getElementById('preview').style.display='none';
+
+      const r = await fetch(`${API}/clients/${id}/qr-link`);
+      if(!r.ok){ document.getElementById('info').textContent='Cliente no encontrado'; return; }
+      const data = await r.json(); // { id, name, url }
+
+      // Pintar QR
+      const canvas = document.getElementById('qrcanvas');
+      await QRCode.toCanvas(canvas, data.url, { width: 220, margin: 1 });
+
+      document.getElementById('who').textContent = `${data.name} (id ${data.id})`;
+      document.getElementById('url').textContent = data.url;
+      document.getElementById('preview').style.display='flex';
+
+      document.getElementById('printBtn').onclick = () => window.print();
+    }
+
+    document.getElementById('go').onclick = ()=>{
+      const id = document.getElementById('id').value.trim();
+      if(id) load(id);
+    };
+
+    // Soporta ?id=123
+    const u = new URL(location.href);
+    const id = u.searchParams.get('id');
+    if(id) { document.getElementById('id').value=id; load(id); }
+  </script>
+</body>
+</html>

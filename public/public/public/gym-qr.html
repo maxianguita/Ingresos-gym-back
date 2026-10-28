@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>QR de ingreso (general)</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f7f7f8;margin:0}
+    .wrap{max-width:800px;margin:24px auto;padding:16px;text-align:center}
+    .card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);padding:24px}
+    .muted{color:#6b7280}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>QR de ingreso</h1>
+      <p class="muted">Escaneá este QR con la cámara del celular para hacer tu check-in con DNI.</p>
+      <canvas id="qr" style="margin:16px auto; display:block;"></canvas>
+      <div id="url" class="muted"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script>
+    // Importante: abrí esta página con la IP de tu PC (no "localhost")
+    // Ej: http://192.168.0.25:3000/gym-qr.html
+    // Así el QR se genera con esa IP y funciona en los celulares.
+    const entryURL = new URL('/entry', location.origin).href;
+    document.getElementById('url').textContent = entryURL;
+    QRCode.toCanvas(document.getElementById('qr'), entryURL, { width: 280, margin: 1 });
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "gym-pass-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --use-system-ca --watch index.js",
+    "start": "node --use-system-ca index.js",
+    "test": "node --use-system-ca --test tests/*.test.js",
+    "admin:setup": "node scripts/setup-admin.js",
+    "backup": "node scripts/backup.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "luxon": "^3.7.1",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^10.2.0",
+    "pg": "^8.16.3"
+  }
+}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Check-in | PRIMAL STRENGTH</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#0b1220; color:#e5e7eb; margin:0 }
+    .wrap { max-width:520px; margin:24px auto; padding:16px }
+    .card { background:#111827; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(0,0,0,.2) }
+    .title { font-weight:800; font-size:22px; margin:0 0 8px }
+    .muted { color:#94a3b8; font-size:14px; margin:0 0 12px }
+    .row { display:flex; gap:8px; }
+    input, button { padding:12px 14px; border-radius:10px; border:1px solid #334155; background:#0b1220; color:#e5e7eb }
+    button { background:#22c55e; border:0; color:#052e16; font-weight:800 }
+    .status { font-size:28px; font-weight:800; padding:14px 16px; border-radius:999px; display:inline-block; margin-top:12px }
+    .ok{ background:#14532d; color:#bbf7d0 }
+    .warning{ background:#854d0e; color:#fef9c3 }
+    .danger{ background:#7f1d1d; color:#fecaca }
+    .expired{ background:#7f1d1d; color:#fecaca }
+    .err { color:#fecaca; margin-top:10px }
+    .link { color:#93c5fd; text-decoration: underline; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1 class="title">Check-in</h1>
+      <p class="muted">Ingresá tu DNI para verificar tu pase y registrar tu entrada. Si tu pase está vencido, se mostrará en rojo.</p>
+      <div class="row">
+        <input id="dni" placeholder="DNI (solo números)" style="flex:1" inputmode="numeric" />
+        <button id="btn">Entrar</button>
+      </div>
+      <div id="out" style="margin-top:12px"> </div>
+
+      <hr style="border-color:#1f2937;margin:16px 0">
+      <p class="muted">¿Tenés tu link personal? <span class="link" id="openMyPass">Abrir Mi Pase</span></p>
+    </div>
+  </div>
+
+  <script>
+    const API = location.origin;
+
+    function paintOK(name, left, status) {
+      document.getElementById('out').innerHTML =
+        `<div class="status ${status}">${name}: te quedan <b>${left}</b> días</div>`;
+      if (navigator.vibrate) navigator.vibrate(40);
+    }
+
+    function paintBad(msg) {
+      document.getElementById('out').innerHTML =
+        `<div class="status expired">${msg || 'Pase vencido'}</div>`;
+      if (navigator.vibrate) navigator.vibrate([120,80,120]);
+    }
+
+    async function checkinByDni(dni){
+      const res = await fetch(API + '/clients/scan-dni', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ dni })
+      });
+      const data = await res.json();
+      if (!res.ok) return paintBad(data.message || data.error || 'DNI inválido o pase vencido');
+      paintOK(data.name, data.days_left, data.status);
+      try { localStorage.setItem('last_dni', dni) } catch {}
+    }
+
+    document.getElementById('btn').onclick = ()=>{
+      const dni = document.getElementById('dni').value.trim();
+      if (dni) checkinByDni(dni);
+    };
+
+    // Autocompletar con el último DNI usado en este celu (comodidad)
+    try {
+      const last = localStorage.getItem('last_dni');
+      if (last) document.getElementById('dni').value = last;
+    } catch {}
+
+    // Atajo a Mi Pase (para quienes guardaron su token personal)
+    document.getElementById('openMyPass').onclick = ()=>{
+      const t = prompt('Pegá tu qr_token (si lo guardaste)');
+      if (t) location.href = `/my-pass?t=${encodeURIComponent(t)}`;
+    };
+  </script>
+</body>
+</html>
