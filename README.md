@@ -8,9 +8,9 @@ de vencimiento por Gmail.
 
 Requiere Node.js 24 y PostgreSQL. Instalar dependencias con `npm ci`, copiar
 `.env.example` a `.env` y completar la conexión a la base y las variables de correo.
-La base debe tener el esquema de socios, datos de contacto, asistencias, campos
-RFID y recordatorios. Ver los archivos de `sql/`; una instalación nueva necesita
-también las columnas de contacto `email`, `phone` y `address` en `clients`.
+Al iniciar, el servidor crea las tablas de socios, datos de contacto, asistencias,
+campos RFID y recordatorios si no existen. La inicialización es transaccional,
+no carga socios de prueba y conserva los datos existentes en los reinicios.
 
 Generar el administrador con `npm run admin:setup` e iniciar con `npm start`.
 Las credenciales iniciales se generan localmente y no se publican en GitHub.

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { pool } from './config/db.js'; // ✅ DB activa
 import clientsRouter from './routes/clients.js';
 import adminRouter from './routes/admin.js';
-import './cron.js';
+import { initializeDatabase } from './services/databaseSchema.js';
 import { auth, trustedOrigin } from './services/auth.js';
 
 // __dirname en ESM
@@ -81,6 +81,10 @@ const port = process.env.PORT || 3001;
 async function start() {
   try {
     await pool.query('SELECT 1');
+    await initializeDatabase();
+    console.log('[DB] Tablas listas: socios, asistencias, tarjetas y recordatorios.');
+    // Activar las tareas únicamente cuando ya existe el esquema completo.
+    await import('./cron.js');
 
     console.log('[DB] Conectado a:', process.env.PGDATABASE);
     console.log('DB OK');
