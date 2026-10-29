@@ -85,7 +85,11 @@ un proxy que derive `/api`, `/auth` y `/admin` al backend). Ajustar `FRONTEND_UR
 al origen real del frontend, `COOKIE_SECURE=true` y las variables de la base.
 No colocar contraseñas en variables `VITE_*`, ya que son públicas.
 
-Crear el administrador en el servidor con `npm.cmd run admin:setup`, instalar
+En Render configurar `ADMIN_USERNAME` y `ADMIN_PASSWORD` (de 12 a 256 caracteres)
+en Environment. No guardarlos en el repositorio. El acceso se conserva al
+reiniciar el servicio; las sesiones abiertas sí requieren volver a ingresar.
+Como alternativa con almacenamiento persistente se puede crear el administrador
+en el servidor con `npm.cmd run admin:setup`. Instalar
 las herramientas PostgreSQL y ejecutar las migraciones `sql/payment-reminders.sql`
 y `sql/rfid.sql` sobre la base correspondiente. Configurar el inicio automático
 del servicio en el servidor elegido. Esta preparación local no publica el sitio.

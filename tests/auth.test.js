@@ -50,3 +50,34 @@ test('login, reception isolation, logout, expiry, credential rotation and login 
     assert.equal((await login('admin')).status, 401);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+test('environment administrator works after restart and rotation invalidates old sessions', async () => {
+  const env = { ADMIN_USERNAME: 'gym-admin', ADMIN_PASSWORD: 'test-password-from-env' };
+  const app = express();
+  app.use(express.json());
+  const auth = createAuth({ env, secure: true });
+  const restarted = createAuth({ env, secure: true });
+  app.post('/login', auth.login);
+  app.post('/restart-login', restarted.login);
+  app.get('/me', auth.me);
+  const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const login = (route = '/login', password = env.ADMIN_PASSWORD) => fetch(base + route, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: env.ADMIN_USERNAME, password }),
+  });
+  try {
+    const response = await login();
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('set-cookie'), /Secure/);
+    const cookie = response.headers.get('set-cookie').split(';')[0];
+    assert.equal((await login('/restart-login')).status, 200);
+    assert.equal((await fetch(base + '/me', { headers: { Cookie: cookie } })).status, 200);
+    env.ADMIN_PASSWORD = 'rotated-test-password';
+    assert.equal((await fetch(base + '/me', { headers: { Cookie: cookie } })).status, 401);
+    assert.equal((await login('/login', 'test-password-from-env')).status, 401);
+    assert.equal((await login()).status, 200);
+    env.ADMIN_PASSWORD = '';
+    assert.equal((await login()).status, 503);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});

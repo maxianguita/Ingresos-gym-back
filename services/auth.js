@@ -5,11 +5,22 @@ export const adminFile = new URL('../.local/admin.json', import.meta.url);
 const hashToken = token => createHash('sha256').update(token).digest('hex');
 const cookieName = 'gym_session';
 
-export function createAuth({ credentials, now = Date.now, secure = process.env.COOKIE_SECURE === 'true' } = {}) {
+export function createAuth({ credentials, env = process.env, now = Date.now, secure = process.env.COOKIE_SECURE === 'true' } = {}) {
   const sessions = new Map();
   const attempts = new Map();
+  let environmentConfig;
   function config() {
     if (credentials) return credentials;
+    if (env.ADMIN_USERNAME || env.ADMIN_PASSWORD) {
+      if (!/^[a-zA-Z0-9._-]{3,40}$/.test(env.ADMIN_USERNAME || '') ||
+          !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 12 || env.ADMIN_PASSWORD.length > 256) return null;
+      const fingerprint = createHash('sha256').update(env.ADMIN_USERNAME).update('\0').update(env.ADMIN_PASSWORD).digest('hex');
+      if (environmentConfig?.fingerprint !== fingerprint) {
+        const salt = randomBytes(16).toString('hex');
+        environmentConfig = { fingerprint, username: env.ADMIN_USERNAME, salt, hash: scryptSync(env.ADMIN_PASSWORD, salt, 64).toString('hex') };
+      }
+      return environmentConfig;
+    }
     try { return JSON.parse(readFileSync(adminFile, 'utf8')); } catch { return null; }
   }
   function cookie(res, value, maxAge) {

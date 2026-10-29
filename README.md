@@ -14,6 +14,9 @@ no carga socios de prueba y conserva los datos existentes en los reinicios.
 
 Generar el administrador con `npm run admin:setup` e iniciar con `npm start`.
 Las credenciales iniciales se generan localmente y no se publican en GitHub.
+En un hosting también se puede configurar `ADMIN_USERNAME` y `ADMIN_PASSWORD`
+(mínimo 12 caracteres) como variables privadas. Estas tienen prioridad sobre
+el archivo local y conservan el acceso tras los reinicios o nuevos despliegues.
 
 - `npm test`: pruebas de acceso, autenticación y recordatorios, sin correos reales.
 - `npm run backup`: respaldo manual PostgreSQL.
