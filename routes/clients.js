@@ -9,13 +9,13 @@ import {
   renewClient,
   getQrLink,
   scanByDni,
-  bindNfc,
   scanNfc,
   publicPass
 } from '../controllers/clientsController.js';
 
 const r = Router();
 import { auth } from '../services/auth.js';
+import managementRouter from './management.js';
 
 r.get('/pass', publicPass);
 r.post('/scan', auth.requireSession, scanQR);
@@ -31,6 +31,9 @@ r.get('/by-dni', findByDniHandler);
 r.get('/:id/status', clientStatus);
 r.post('/:id/renew', renewClient);
 r.get('/:id/qr-link', getQrLink);
-r.post('/:id/bind-nfc', bindNfc);
+r.post('/:id/bind-nfc', (req, res, next) => {
+  req.url = `/clients/${req.params.id}/cards`;
+  return managementRouter(req, res, next);
+});
 
 export default r;

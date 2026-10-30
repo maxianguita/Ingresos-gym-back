@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { pool } from './config/db.js'; // ✅ DB activa
 import clientsRouter from './routes/clients.js';
 import adminRouter from './routes/admin.js';
+import managementRouter from './routes/management.js';
 import { initializeDatabase } from './services/databaseSchema.js';
 import { auth, trustedOrigin } from './services/auth.js';
 
@@ -20,7 +21,7 @@ const app = express();
 // 🔹 CORS
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true
 }));
 
@@ -64,6 +65,7 @@ app.get('/', (_req, res) => {
 
 // 🔹 API
 app.use('/api/clients', clientsRouter);
+app.use('/api/management', managementRouter);
 app.use('/admin', adminRouter);
 
 // 🔴 Error handler global

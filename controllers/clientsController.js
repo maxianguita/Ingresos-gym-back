@@ -31,7 +31,7 @@ export async function listAll(req, res) {
     const page = Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1;
     const limit = Number.isSafeInteger(limitValue) && limitValue > 0 ? Math.min(100, limitValue) : 12;
     const qtext = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    const filter = ['all', 'ok', 'warn', 'off'].includes(req.query.filter) ? req.query.filter : 'all';
+    const filter = ['all', 'ok', 'warn', 'off', 'paused'].includes(req.query.filter) ? req.query.filter : 'all';
     const offset = (page - 1) * limit;
 
     const result = await listClients({ qtext, limit, offset, filter, todayISO: today().toISODate() });
@@ -185,7 +185,7 @@ export async function deleteClient(req, res) {
     // Detectar error de FK (Postgres code 23503)
     if (err.code === '23503') {
       return res.status(409).json({
-        error: 'No se puede eliminar el cliente porque tiene registros relacionados'
+        error: 'Este socio tiene pagos registrados. Conservá su historial y pausá la membresía.'
       });
     }
 

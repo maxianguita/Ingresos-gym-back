@@ -108,20 +108,22 @@ export async function listClients({ qtext = '', limit = 12, offset = 0, filter =
   const base = `FROM clients WHERE (name ILIKE $1 OR dni ILIKE $1)`;
   const { rows: [stats] } = await q(`
     SELECT COUNT(*)::int AS all,
-      COUNT(*) FILTER (WHERE end_date - $2::date > 7)::int AS ok,
-      COUNT(*) FILTER (WHERE end_date - $2::date BETWEEN 0 AND 7)::int AS warn,
-      COUNT(*) FILTER (WHERE end_date < $2::date)::int AS off
+      COUNT(*) FILTER (WHERE is_active AND NOT is_paused AND end_date - $2::date > 7)::int AS ok,
+      COUNT(*) FILTER (WHERE is_active AND NOT is_paused AND end_date - $2::date BETWEEN 0 AND 7)::int AS warn,
+      COUNT(*) FILTER (WHERE end_date < $2::date)::int AS off,
+      COUNT(*) FILTER (WHERE is_paused)::int AS paused
     ${base}
   `, [search, todayISO]);
   const conditions = {
     all: 'TRUE',
-    ok: 'end_date - $2::date > 7',
-    warn: 'end_date - $2::date BETWEEN 0 AND 7',
+    ok: 'is_active AND NOT is_paused AND end_date - $2::date > 7',
+    warn: 'is_active AND NOT is_paused AND end_date - $2::date BETWEEN 0 AND 7',
     off: 'end_date < $2::date',
+    paused: 'is_paused',
   };
   const selected = Object.hasOwn(conditions, filter) ? filter : 'all';
   const { rows } = await q(`
-    SELECT id, dni, name,
+    SELECT id, dni, name, is_active, is_paused,
       to_char(start_date, 'YYYY-MM-DD') AS start_date,
       to_char(end_date, 'YYYY-MM-DD') AS end_date,
       end_date - $2::date AS days_left

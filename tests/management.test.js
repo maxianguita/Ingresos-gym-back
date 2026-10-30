@@ -1,0 +1,96 @@
+import 'dotenv/config';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { randomBytes, randomUUID } from 'node:crypto';
+import pg from 'pg';
+import express from 'express';
+import { pool } from '../config/db.js';
+import { initializeDatabase } from '../services/databaseSchema.js';
+import { createManagementRouter } from '../routes/management.js';
+import { accessDecision } from '../services/access.js';
+import { today, toISODate } from '../utils/date.js';
+
+test('management preserves edits, pauses access, records payments once, blocks lost cards and reports Argentine dates', async () => {
+  const schema = `test_management_${randomBytes(8).toString('hex')}`;
+  let isolated;
+  let server;
+  try {
+    await pool.query(`CREATE SCHEMA "${schema}"`);
+    isolated = new pg.Pool({ ...pool.options, options: `-c search_path=${schema}` });
+    await initializeDatabase(isolated);
+    await initializeDatabase(isolated);
+    const end = today().plus({ days: 2 }).toISODate();
+    const client = (await isolated.query(`INSERT INTO clients (dni,name,qr_token,start_date,end_date,nfc_uid)
+      VALUES ('12345678','Test','test-token',$1,$2,'A1B2') RETURNING *`, [today().toISODate(), end])).rows[0];
+    const other = (await isolated.query(`INSERT INTO clients (dni,name,qr_token,start_date,end_date) VALUES ('87654321','Other','other-token',$1,$1) RETURNING *`, [today().toISODate()])).rows[0];
+    const app = express(); app.use(express.json());
+    app.use('/protected', createManagementRouter(isolated));
+    app.use('/manage', createManagementRouter(isolated, (req, _res, next) => { req.session = { username: 'test-receptionist' }; next(); }));
+    server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const request = (path, method = 'GET', body) => fetch(`${base}/manage${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const path = `/clients/${client.id}`;
+    assert.equal((await fetch(`${base}/protected/dashboard`)).status, 401);
+    let response = await request(path, 'PATCH', { name: 'Edited', email: 'edited@example.com', phone: '123', address: 'Address' });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).email, 'edited@example.com');
+    assert.equal((await request(path, 'PATCH', { dni: '87654321' })).status, 409);
+    assert.equal((await request(path, 'PATCH', { email: 'bad' })).status, 400);
+    assert.equal((await request(path, 'PATCH', { end_date: '2030-01-01' })).status, 400);
+    response = await request(path + '/state', 'POST', { paused: true });
+    assert.equal((await response.json()).status, 'paused');
+    assert.equal(accessDecision((await isolated.query('SELECT * FROM clients WHERE id=$1', [client.id])).rows[0]).allowed, false);
+    response = await request(path + '/state', 'POST', { paused: false });
+    assert.equal((await response.json()).allowed, true);
+    const payment = { request_id: randomUUID(), amount: '12500.50', method: 'transfer', paid_on: today().toISODate(), renewal_days: 30, notes: 'Test payment' };
+    const results = await Promise.all([request(path + '/payments', 'POST', payment), request(path + '/payments', 'POST', payment)]);
+    assert.deepEqual(results.map(r => r.status).sort(), [200, 201]);
+    const saved = (await isolated.query('SELECT * FROM payments')).rows;
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].amount, '12500.50');
+    assert.equal(saved[0].recorded_by, 'test-receptionist');
+    assert.equal(toISODate(saved[0].new_end_date), today().plus({ days: 32 }).toISODate());
+    assert.equal((await request(path + '/payments', 'POST', { ...payment, amount: '999' })).status, 409);
+    assert.equal((await request(path + '/payments', 'POST', { ...payment, request_id: randomUUID(), amount: '-1' })).status, 400);
+    assert.equal((await request(path + '/payments', 'POST', { ...payment, request_id: randomUUID(), paid_on: today().plus({ days: 1 }).toISODate() })).status, 400);
+    assert.equal((await request(`/clients/${other.id}/cards`, 'POST', { uid: 'A1B2' })).status, 409);
+    assert.equal((await request(path + '/cards', 'POST', { uid: 'C3D4' })).status, 200);
+    assert.equal((await isolated.query("SELECT COUNT(*)::int AS n FROM clients WHERE nfc_uid='A1B2'")).rows[0].n, 0);
+    assert.equal((await request(`/clients/${other.id}/cards`, 'POST', { uid: 'A1B2' })).status, 409);
+    assert.equal((await request(path + '/cards', 'DELETE')).status, 200);
+    assert.equal((await request(path + '/cards', 'POST', { uid: 'C3D4' })).status, 409);
+    assert.equal((await request(path + '/cards', 'POST', { uid: 'E5F6' })).status, 200);
+    const detail = await (await request(path)).json();
+    assert.equal(detail.blocked_cards.length, 2);
+    assert.equal(detail.payments.length, 1);
+    await assert.rejects(isolated.query('DELETE FROM clients WHERE id=$1', [client.id]), { code: '23503' });
+    for (const timestamp of [today().minus({ minutes: 1 }), today(), today().plus({ days: 1 })]) {
+      await isolated.query('INSERT INTO checkins (client_id,scanned_at) VALUES ($1,$2)', [client.id, timestamp.toISO()]);
+    }
+    const query = `?from=${today().toISODate()}&to=${today().toISODate()}&client_id=${client.id}`;
+    const history = await (await request('/checkins' + query)).json();
+    assert.equal(history.total, 1);
+    const dashboardResponse = await request('/dashboard');
+    assert.equal(dashboardResponse.status, 200);
+    const dashboard = await dashboardResponse.json();
+    assert.equal(dashboard.counts.total, 2);
+    assert.equal(dashboard.today.entries, 1);
+    assert.equal(dashboard.today.unique_members, 1);
+    assert.equal(Number(dashboard.today.total_amount), 12500.50);
+    await isolated.query('UPDATE clients SET end_date=$2,is_paused=true,is_active=false WHERE id=$1', [client.id, today().minus({ days: 5 }).toISODate()]);
+    const renewed = await (await request(path + '/payments', 'POST', { ...payment, request_id: randomUUID(), amount: '100' })).json();
+    assert.equal(renewed.client.end_date, today().plus({ days: 30 }).toISODate());
+    assert.equal(renewed.client.is_paused, false);
+    assert.equal(renewed.client.allowed, true);
+    await request(path + '/state', 'POST', { paused: true });
+    const paymentOnly = await (await request(path + '/payments', 'POST', { ...payment, request_id: randomUUID(), renewal_days: 0, amount: '50' })).json();
+    assert.equal(paymentOnly.client.end_date, renewed.client.end_date, 'registrar un pago sin renovación no extiende el pase');
+    assert.equal(paymentOnly.client.is_paused, true, 'registrar dinero sin renovar no levanta una pausa');
+    assert.equal((await request('/checkins?from=bad')).status, 400);
+  } finally {
+    if (server) await new Promise(resolve => server.close(resolve));
+    if (isolated) await isolated.end();
+    await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    await pool.end();
+  }
+});

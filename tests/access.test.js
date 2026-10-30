@@ -22,7 +22,7 @@ test('QR, DNI and NFC deny inactive/expired passes and accept the same card afte
   let server;
   try {
     await client.query('BEGIN');
-    await client.query(`CREATE TEMP TABLE clients (id SERIAL PRIMARY KEY, dni TEXT, name TEXT, email TEXT, qr_token TEXT, start_date DATE, end_date DATE, is_active BOOLEAN, nfc_uid TEXT, nfc_last_seen TIMESTAMPTZ, updated_at TIMESTAMPTZ)`);
+    await client.query(`CREATE TEMP TABLE clients (id SERIAL PRIMARY KEY, dni TEXT, name TEXT, email TEXT, qr_token TEXT, start_date DATE, end_date DATE, is_active BOOLEAN, is_paused BOOLEAN DEFAULT FALSE, nfc_uid TEXT, nfc_last_seen TIMESTAMPTZ, updated_at TIMESTAMPTZ)`);
     await client.query(`CREATE TEMP TABLE checkins (client_id INTEGER, scanned_at TIMESTAMPTZ DEFAULT NOW())`);
     pool.query = (...args) => client.query(...args);
     await client.query(`INSERT INTO clients (dni,name,qr_token,start_date,end_date,is_active,nfc_uid) VALUES ('12345678','Test',$1,$2,$3,true,'AB12')`, ['a'.repeat(32), today().toISODate(), today().plus({ days: 3 }).toISODate()]);
@@ -37,6 +37,14 @@ test('QR, DNI and NFC deny inactive/expired passes and accept the same card afte
     assert.equal(await count(), 3);
     assert.equal((await fetch(`${base}/pass?token=${'a'.repeat(32)}`)).status, 200);
     assert.equal(await count(), 3, 'consultar el pase no registra ingreso');
+    await client.query('UPDATE clients SET is_paused=true');
+    for (const [route, body] of methods) {
+      const response = await scan(route, body);
+      assert.equal(response.status, 403);
+      assert.equal((await response.json()).status, 'paused');
+    }
+    assert.equal(await count(), 3, 'un socio pausado no registra asistencia');
+    await client.query('UPDATE clients SET is_paused=false');
     await client.query('UPDATE clients SET is_active=false');
     for (const [route, body] of methods) assert.equal((await scan(route, body)).status, 403);
     await client.query('UPDATE clients SET is_active=true, end_date=$1', [today().minus({ days: 1 }).toISODate()]);

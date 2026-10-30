@@ -9,5 +9,6 @@ export function accessDecision(client) {
   if (left < 0) return { allowed: false, ...details, status: 'expired', message: 'Pase vencido. Por favor, acercate a renovar.' };
   if (client.is_active !== true) return { allowed: false, ...details, status: 'inactive', message: 'Pase inactivo. Acercate a recepción.' };
   if (startDate && startDate > today().toISODate()) return { allowed: false, ...details, status: 'inactive', message: 'Tu membresía todavía no comenzó. Acercate a recepción.' };
+  if (client.is_paused) return { allowed: false, ...details, status: 'paused', message: 'Membresía pausada. Acercate a recepción.' };
   return { allowed: true, ...details };
 }

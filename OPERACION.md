@@ -94,7 +94,41 @@ las herramientas PostgreSQL y ejecutar las migraciones `sql/payment-reminders.sq
 y `sql/rfid.sql` sobre la base correspondiente. Configurar el inicio automático
 del servicio en el servidor elegido. Esta preparación local no publica el sitio.
 
-## Verificación
+## Gestión de recepción
+
+El menú **Resumen** muestra socios vigentes, próximos vencimientos, pausados,
+vencidos, ingresos y pagos del día en horario argentino. Usar Actualizar para
+consultar nuevos movimientos. Los importes corresponden a pagos registrados,
+no a cargos automáticos ni a facturas fiscales.
+
+En **Socios → Ver ficha** se pueden corregir datos de contacto y DNI, pausar o
+reactivar la membresía, registrar pagos, consultar asistencias y gestionar el
+llavero. Pausar bloquea el acceso pero NO congela ni extiende los días del pase.
+Reactivar conserva el vencimiento; si está vencido, hace falta renovar.
+
+En **Pagos**, registrar únicamente dinero ya recibido. Se guardan monto en ARS,
+fecha, medio de pago, notas y el usuario que lo registró. Los días de renovación
+se suman al vencimiento vigente o, si ya venció, a la fecha actual. Una renovación
+reactiva el pase y levanta la pausa. El alta ya incluye el primer período:
+para registrar ese pago sin extenderlo otra vez, usar 0 días. Los reintentos
+del mismo formulario utilizan un identificador único para evitar duplicados.
+Si se pierde la conexión, revisar el historial antes de volver a cargar el pago.
+El historial de pagos impide eliminar al socio; pausar en lugar de borrarlo.
+
+En **Llavero**, reemplazar o bloquear un llavero perdido deja bloqueado el código
+anterior. Un código bloqueado no puede reutilizarse ni asignarse a otro socio.
+El historial muestra quién lo bloqueó y cuándo. La nueva tarjeta debe vincularse
+antes de usarla. La compatibilidad física sigue pendiente del lector real.
+
+En **Asistencias**, filtrar por fechas (hasta un año por consulta). La ficha
+individual permite consultar solo los ingresos de ese socio. Se listan 25 por
+página y únicamente entradas que fueron permitidas.
+
+Las nuevas tablas y columnas se crean automáticamente al iniciar el servidor,
+sin borrar ni importar datos. Subir primero el backend y esperar que el despliegue
+termine antes de publicar el frontend actualizado.
+
+## Comprobaciones del código
 
 - Backend: `npm.cmd test`. Usa tablas temporales para las pruebas de base y no
   envía correos reales.

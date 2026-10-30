@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { pool } from '../config/db.js';
 
 export async function applySchema(connection) {
-  for (const name of ['schema.sql', 'rfid.sql', 'payment-reminders.sql']) {
+  for (const name of ['schema.sql', 'rfid.sql', 'payment-reminders.sql', 'management.sql']) {
     const sql = await readFile(new URL(`../sql/${name}`, import.meta.url), 'utf8');
     // La inicialización controla una única transacción para todos los archivos.
     await connection.query(sql.replace(/^\s*(?:BEGIN|COMMIT);\s*$/gim, ''));
